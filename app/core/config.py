@@ -21,7 +21,8 @@ REVIEWERS = ("bug", "perf", "unity")   # 리뷰어 종류. --only 로 일부만 
 BATCH_LINES = 600          # 리뷰어 1회 호출에 넣을 코드 줄 수 상한
 MAX_FILES = 100            # 비용 상한 (--max-files 로 덮어쓴다)
 MAX_PARALLEL = 4           # graph.ainvoke config 의 max_concurrency. API 속도 제한 대비
-PASS_PROB = 0.5            # Jev 가 지적이 타당하다고 본 확률이 이 값 이상이면 통과
+PASS_PROB = 0.35           # Jev 가 지적이 타당하다고 본 확률이 이 값 이상이면 통과. GPT 검증자가 먼저 걸렀으므로 Jev 는 명백히 약한 지적만 거르는 거부권으로 쓴다
+                           # (실측: Unity 특유의 타당한 지적이 0.36~0.49, 근거가 약한 지적이 0.21~0.34 에 몰렸다)
 WORKER_CALL_LIMIT = 12     # 에이전트 한 번 실행당 모델 호출 상한
 EXCLUDE_DIRS = ("Editor", "Plugins", "ThirdParty", "SPUM", "TextMesh Pro")   # 리뷰하지 않는 폴더 이름
 

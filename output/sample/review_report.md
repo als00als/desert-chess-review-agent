@@ -6,128 +6,150 @@
 | --- | --- |
 | 리뷰 파일 | 5개 (172줄, 배치 1개) |
 | 리뷰어 | 버그, 성능, Unity 안티패턴 |
-| 리뷰어 지적 → 최종 | 22건 → **14건** (검증 기각 0, 병합 8) |
-| 등급별 | P0 0 · P1 6 · P2 6 · P3 2 |
-| 분류별 | 버그 4 · 성능 4 · Unity 6 |
-| 소요 시간 · 토큰 | 72.2초 · 56,956 토큰 (gpt-5.6-luna) |
+| 리뷰어 지적 → 최종 | 19건 → **13건** (검증 기각 0, 병합 6) |
+| 등급별 | P0 1 · P1 6 · P2 5 · P3 1 |
+| 분류별 | 버그 3 · 성능 4 · Unity 6 |
+| 소요 시간 · 토큰 | 64.7초 · 56,682 토큰 (gpt-5.6-luna) |
 
 ## 2. 총평
 
-가장 시급한 문제는 P1 항목에 집중되어 있으며, 이벤트 구독 해제 누락과 파괴된 Unity 객체 처리 오류, 컬렉션 순회 중 수정, 무기 배열 범위 초과가 런타임 장애를 일으킬 수 있다.  
-또한 `GameManagerSeed`의 싱글턴 중복 생성 시 인스턴스 덮어쓰기와 부모가 있는 오브젝트에 대한 `DontDestroyOnLoad` 호출을 우선 정리해야 한다.  
-반복되는 패턴으로는 `Update`에서의 객체 검색·컴포넌트 조회·UI 폴링·문자열 생성·Animator 문자열 사용이 있으며, 이를 캐싱하고 변경 시점 기반 갱신으로 전환하는 작업이 P2 개선 순서다.  
-이후 이동 처리의 프레임 의존성을 보완하고, 태그 비교 방식과 체력 필드 노출 같은 P3 코드 품질 항목을 정리하는 순서가 적절하다.
+가장 시급한 문제는 `EnemySeed`의 `foreach` 중 컬렉션을 수정해 예외가 발생하는 P0 버그로, 게임 진행을 즉시 중단시킬 수 있으므로 최우선 수정이 필요하다. 그다음으로 정적 이벤트 구독 해제 누락, Unity 객체의 잘못된 null 처리, 싱글턴 중복 생성 및 자식 오브젝트의 `DontDestroyOnLoad` 사용처럼 객체 생명주기와 씬 전환에 관련된 문제를 우선 정리해야 한다. 이후 물리 이동을 `Update`에서 처리하는 문제와 음수 배열 인덱스 접근을 수정해 런타임 동작의 안정성을 확보해야 한다. 마지막으로 매 프레임 반복되는 검색·컴포넌트 조회·문자열 갱신과 공개 상태 필드를 개선해 성능과 캡슐화를 보완하는 순서가 적절하다.
 
 ## 3. 지적 목록
 
-### P1 잘못된 동작 — 6건
+### P0 즉시 수정 (크래시·진행 불가) — 1건
 
-#### BUG-001 · 정적 사망 이벤트 구독 해제 누락
-- 위치: `EnemySeed.cs:17-20` · 분류: 버그 (+Unity 안티패턴) · Jev 0.88
-- 이유: OnEnable에서 static 이벤트에 HandleAllyDied를 구독하지만 OnDisable 또는 OnDestroy에서 해제하지 않습니다. 그 결과 비활성화·파괴된 객체가 이벤트에 계속 남고, 재활성화할 때마다 동일 핸들러가 중복 등록되어 이후 사망 이벤트가 여러 번 처리될 수 있습니다.
-- 수정 제안: OnDisable에서 `OnAnyEnemyDied -= HandleAllyDied;`를 호출해 구독을 해제하세요. OnEnable/OnDisable 호출 주기에 맞춰 항상 중복 없이 등록·해제되도록 구성해야 합니다.
+#### BUG-001 · foreach 중 nearbyAllies.Remove로 InvalidOperationException 발생
+- 위치: `EnemySeed.cs:30-35` · 분류: 버그 (+Unity 안티패턴) · Jev 0.88
+- 이유: foreach로 순회 중인 List에서 요소를 제거하면 열거자가 무효화됩니다. 사망한 아군을 제거하는 정상 흐름에서 nearbyAllies.Remove(ally)가 실행되는 즉시 InvalidOperationException이 발생합니다.
+- 수정 제안: 순회 없이 `nearbyAllies.Remove(dead);`를 호출하세요. 중복 제거가 필요하다면 반환값을 확인하거나, 여러 조건에 맞는 항목을 제거해야 할 경우 역방향 for문 또는 `RemoveAll`을 사용하세요.
 
 ```csharp
-         private void OnEnable()
-         {
-             OnAnyEnemyDied += HandleAllyDied;
-         }
+foreach (EnemySeed ally in nearbyAllies)
+{
+    if (ally == dead)
+    {
+        nearbyAllies.Remove(ally);
+    }
+}
 ```
 
-#### UNITY-001 · 파괴된 Unity 객체에 null 조건 연산자를 사용한다
-- 위치: `EnemySeed.cs:24` · 분류: Unity 안티패턴 · Jev 0.64
-- 이유: `UnityEngine.Object`의 파괴된 객체는 C#의 `?.`가 검사하는 실제 null과 다릅니다. `target`이 파괴된 뒤에도 `target?.position`이 접근되어 `MissingReferenceException`이 발생할 수 있습니다.
-- 수정 제안: Vector3 goal = target != null ? target.position : transform.position;
 
-단, 파괴된 Unity 객체까지 안전하게 처리하려면 참조 생명주기를 관리하거나 `target`을 재할당해야 합니다.
+### P1 잘못된 동작 — 6건
+
+#### BUG-002 · EnemySeed의 정적 이벤트 구독 해제 누락
+- 위치: `EnemySeed.cs:17-20` · 분류: 버그 (+Unity 안티패턴) · Jev 0.88
+- 이유: OnEnable에서 정적 이벤트 OnAnyEnemyDied에 HandleAllyDied를 등록하지만 OnDisable 또는 OnDestroy에서 해제하지 않습니다. 이로 인해 EnemySeed가 파괴된 뒤에도 이벤트가 해당 인스턴스를 참조해 핸들러를 호출하고, 비활성화·재활성화를 반복하면 동일 핸들러가 중복 등록될 수 있습니다.
+- 수정 제안: OnDisable에서 동일한 핸들러를 반드시 해제하세요: `private void OnDisable() { OnAnyEnemyDied -= HandleAllyDied; }`
+
+```csharp
+private void OnEnable()
+{
+    OnAnyEnemyDied += HandleAllyDied;
+}
+```
+
+#### UNITY-001 · Unity 객체에 null 조건 연산자를 사용해 파괴된 참조를 제대로 처리하지 못함
+- 위치: `EnemySeed.cs:24` · 분류: Unity 안티패턴 · Jev 0.75
+- 이유: `Transform`이 `Destroy`된 경우 C#의 `?.`는 Unity의 가짜 null 판정을 사용하지 않는다. 따라서 파괴된 `target`의 `position` 접근으로 `MissingReferenceException`이 발생할 수 있다.
+- 수정 제안: Vector3 goal = target != null ? target.position : transform.position;
 
 ```csharp
 Vector3 goal = target?.position ?? transform.position;
 ```
 
-#### BUG-002 · foreach 중 nearbyAllies.Remove 호출로 InvalidOperationException 발생
-- 위치: `EnemySeed.cs:30-35` · 분류: 버그 (+Unity 안티패턴) · Jev 0.82
-- 이유: foreach로 nearbyAllies를 순회하는 동안 같은 리스트에서 Remove를 호출합니다. 사망한 적이 목록에 포함된 일반적인 상황에서 열거자가 무효화되어 InvalidOperationException이 발생하고 이벤트 처리와 게임 흐름이 중단됩니다.
-- 수정 제안: foreach 대신 `nearbyAllies.RemoveAll(ally => ally == dead);`를 사용하거나, 제거할 항목을 별도로 수집한 뒤 순회가 끝난 후 제거하세요.
+#### UNITY-002 · GameManagerSeed의 자식 오브젝트에 DontDestroyOnLoad 호출
+- 위치: `GameManagerSeed.cs:5-17` · 분류: Unity 안티패턴 · Jev 0.38
+- 이유: GameManagerSeed가 Managers 부모 오브젝트의 자식이므로 루트 오브젝트가 아니다. Unity에서 DontDestroyOnLoad는 루트 오브젝트에만 적용되므로 경고와 함께 무시되고, 씬 전환 시 GameManagerSeed가 파괴된다.
+- 수정 제안: GameManagerSeed를 루트로 분리한 뒤 DontDestroyOnLoad를 호출하거나, Awake에서 transform.SetParent(null)로 루트로 만든 다음 DontDestroyOnLoad(gameObject)를 호출한다. 부모인 Managers 전체를 유지해야 한다면 Managers 루트에 DontDestroyOnLoad를 적용한다.
 
 ```csharp
-             foreach (EnemySeed ally in nearbyAllies)
-             {
-                 if (ally == dead)
-                 {
-                     nearbyAllies.Remove(ally);
-                 }
+// 씬 계층: =====Managers===== (빈 부모 오브젝트) / GameManagerSeed
+...
+Instance = this;
+DontDestroyOnLoad(gameObject);
 ```
 
-#### BUG-003 · GameManagerSeed 싱글턴 중복 생성 시 Instance를 덮어씀
-- 위치: `GameManagerSeed.cs:14-17` · 분류: 버그 (+Unity 안티패턴) · Jev 0.83
-- 이유: DontDestroyOnLoad로 기존 GameManagerSeed가 유지된 상태에서 새 씬의 인스턴스가 Awake를 실행하면, 기존 인스턴스를 제거하지 않고 Instance만 새 객체로 덮어씁니다. 그 결과 여러 매니저가 동시에 존재하고, 씬 전환이나 호출 순서에 따라 서로 다른 인스턴스가 사용될 수 있습니다.
-- 수정 제안: Awake에서 이미 다른 Instance가 있으면 새 객체를 즉시 제거하고, 유일한 인스턴스일 때만 Instance를 설정하고 DontDestroyOnLoad를 호출합니다. 제거된 객체에서는 이후 초기화가 실행되지 않도록 return해야 합니다.
+#### UNITY-003 · GameManagerSeed 싱글턴 중복 생성 및 Instance 덮어쓰기
+- 위치: `GameManagerSeed.cs:14-18` · 분류: Unity 안티패턴 · Jev 0.85
+- 이유: 기존 인스턴스가 존재해도 새 GameManagerSeed를 삭제하지 않아 씬 재진입이나 중복 배치 시 여러 매니저가 남고, 새 인스턴스가 Instance를 덮어쓴다. 이 과정에서 currentRound 같은 상태가 재초기화될 수 있다.
+- 수정 제안: Awake에서 Instance가 이미 존재하고 현재 객체와 다르면 Destroy(gameObject) 후 즉시 return한다. 유효한 단일 인스턴스에만 Instance를 할당하고 초기화 및 DontDestroyOnLoad를 수행한다.
 
 ```csharp
 private void Awake()
 {
     Instance = this;
     DontDestroyOnLoad(gameObject);
+    currentRound = startRound;
+}
 ```
 
-#### UNITY-002 · GameManagerSeed의 부모가 있는 오브젝트에 DontDestroyOnLoad 호출
-- 위치: `GameManagerSeed.cs:16-17` · 분류: Unity 안티패턴 · Jev 0.72
-- 이유: GameManagerSeed가 씬 계층의 Managers 부모 아래에 있으면, 해당 오브젝트에 DontDestroyOnLoad(gameObject)를 호출해도 Unity가 루트 오브젝트가 아니라는 경고를 출력하고 씬 전환 시 보존하지 않을 수 있습니다. 그 결과 매니저가 씬 전환과 함께 파괴됩니다.
-- 수정 제안: GameManagerSeed를 루트 오브젝트로 이동한 뒤 DontDestroyOnLoad(gameObject)를 호출하거나, 부모인 Managers 오브젝트 전체를 루트 단위로 보존합니다.
+#### UNITY-004 · Rigidbody2D MovePosition을 Update에서 프레임 시간 없이 호출
+- 위치: `PlayerSeed.cs:16-17` · 분류: Unity 안티패턴 (+버그) · Jev 0.94
+- 이유: Rigidbody2D 이동을 Update에서 수행하고 이동량에 Time.fixedDeltaTime을 곱하지 않아 물리 프레임과 동기화되지 않으며, 프레임레이트에 따라 실제 이동 속도가 달라집니다.
+- 수정 제안: 입력 수집은 Update에서 유지하고, Rigidbody2D를 Awake에서 캐싱한 뒤 이동은 FixedUpdate에서 `body.MovePosition(body.position + input * moveSpeed * Time.fixedDeltaTime)`로 수행하세요.
 
 ```csharp
-Instance = this;
-DontDestroyOnLoad(gameObject);
+Rigidbody2D body = GetComponent<Rigidbody2D>();
+body.MovePosition(body.position + input * moveSpeed);
 ```
 
-#### BUG-004 · WeaponSeed.Fire의 usesLeft 선감소로 인한 배열 범위 초과
-- 위치: `WeaponSeed.cs:17-21` · 분류: 버그 (+Unity 안티패턴) · Jev 0.82
-- 이유: 사용 가능 횟수가 0인 상태에서 Fire()가 호출되면 usesLeft를 먼저 -1로 감소시킨 뒤 projectilePrefabs[-1]에 접근하므로 IndexOutOfRangeException이 발생합니다. 두 지적은 동일한 원인과 증상을 다룹니다.
-- 수정 제안: Fire() 시작 시 CanFire를 확인하고, 발사 가능한 경우에만 usesLeft를 감소시키고 배열에 접근하세요. 예: `if (!CanFire) return; GameObject prefab = projectilePrefabs[--usesLeft];`
+#### BUG-003 · Fire의 음수 배열 인덱스 접근
+- 위치: `WeaponSeed.cs:17-21` · 분류: 버그 (+Unity 안티패턴) · Jev 0.83
+- 이유: usesLeft가 0일 때 Fire()가 호출되면 값을 먼저 감소시켜 -1로 만든 뒤 projectilePrefabs[-1]에 접근하므로 IndexOutOfRangeException이 발생합니다. 호출자가 CanFire를 확인하더라도 Fire 자체가 방어하지 않아 잘못된 호출에 취약합니다.
+- 수정 제안: Fire() 시작 시 usesLeft가 0 이하인지 검사해 즉시 반환하고, 유효한 경우에만 usesLeft를 감소시켜 배열에 접근하세요. 예: `if (usesLeft <= 0) return; GameObject prefab = projectilePrefabs[--usesLeft];`
 
 ```csharp
-         public void Fire()
-         {
-             usesLeft--;
-             GameObject prefab = projectilePrefabs[usesLeft];
-             Instantiate(prefab, transform.position, transform.rotation);
+public void Fire()
+{
+    usesLeft--;
+    GameObject prefab = projectilePrefabs[usesLeft];
+    Instantiate(prefab, transform.position, transform.rotation);
+}
 ```
 
 
-### P2 성능·잠재 버그 — 6건
+### P2 성능·잠재 버그 — 5건
 
-#### UNITY-003 · Update에서 FindObjectOfType을 매 프레임 호출
-- 위치: `HudSeed.cs:12` · 분류: Unity 안티패턴 (+버그, 성능) · Jev 0.92
-- 이유: HUD가 갱신될 때마다 씬 전체에서 PlayerHealthSeed를 검색하므로 매 프레임 불필요한 탐색 비용이 발생합니다.
-- 수정 제안: PlayerHealthSeed를 SerializeField로 주입하거나 초기화 시 한 번만 FindObjectOfType으로 찾아 참조를 캐시하세요. 가능하면 체력 변경 이벤트를 구독해 변경 시점에만 HUD를 갱신하세요.
+#### PERF-001 · Update에서 FindObjectOfType로 PlayerHealthSeed를 매 프레임 검색
+- 위치: `HudSeed.cs:10-13` · 분류: 성능 (+버그, Unity 안티패턴) · Jev 0.93
+- 이유: HudSeed.Update()가 매 프레임 FindObjectOfType<PlayerHealthSeed>()를 호출해 씬 전체를 반복 검색합니다. 체력 값이 변하지 않는 프레임에도 검색 비용이 발생하므로 불필요한 성능 저하가 생깁니다.
+- 수정 제안: PlayerHealthSeed를 [SerializeField] 참조로 주입하거나 Awake/Start에서 한 번만 찾아 캐시하세요. 이후에는 PlayerHealthSeed의 체력 변경 이벤트를 구독해 값이 변경될 때만 HUD를 갱신하는 방식이 가장 좋습니다.
 
 ```csharp
-PlayerHealthSeed health = FindObjectOfType<PlayerHealthSeed>();
+private void Update()
+{
+    PlayerHealthSeed health = FindObjectOfType<PlayerHealthSeed>();
+    hpLabel.text = $"HP {health.Current} / {health.Max}";
+}
 ```
 
-#### PERF-001 · HP UI를 매 프레임 폴링하고 갱신
-- 위치: `HudSeed.cs:13` · 분류: 성능 · Jev 0.83
-- 이유: HP가 변하지 않은 프레임에도 라벨의 텍스트를 매번 다시 설정해 불필요한 UI 갱신 비용이 발생합니다.
-- 수정 제안: PlayerHealthSeed의 체력 변경 이벤트를 구독하고, HP가 실제로 변경된 경우에만 hpLabel.text를 갱신하세요.
+#### PERF-002 · Update에서 HP 문자열과 hpLabel.text를 매 프레임 갱신
+- 위치: `HudSeed.cs:10-14` · 분류: 성능 · Jev 0.71
+- 이유: 현재 코드는 HP 값이 바뀌지 않아도 문자열 보간으로 새 문자열을 만들고 hpLabel.text를 계속 대입합니다. 이로 인해 불필요한 GC 할당과 UI 갱신 비용이 발생할 수 있습니다.
+- 수정 제안: 현재 체력과 최대 체력의 이전 값을 저장하고 값이 변경된 경우에만 문자열을 생성해 hpLabel.text를 갱신하세요. 가능하면 체력 변경 이벤트에서만 갱신하도록 구성하세요.
 
 ```csharp
-hpLabel.text = $"HP {health.Current} / {health.Max}";
+private void Update()
+{
+    PlayerHealthSeed health = FindObjectOfType<PlayerHealthSeed>();
+    hpLabel.text = $"HP {health.Current} / {health.Max}";
+}
 ```
 
-#### PERF-002 · 문자열 보간으로 매 프레임 HP 문자열 생성
-- 위치: `HudSeed.cs:13` · 분류: 성능 · Jev 0.76
-- 이유: 매 프레임 문자열 보간을 수행해 새로운 문자열이 생성되므로 불필요한 GC 할당과 수집 부담이 발생합니다.
-- 수정 제안: HP 변경 시점에만 문자열을 생성하도록 갱신 로직을 이벤트 기반으로 변경하세요. 단순히 string.Format으로 바꾸기보다 매 프레임 문자열 생성 자체를 제거하는 것이 적절합니다.
+#### UNITY-005 · 태그 비교에 gameObject.tag를 사용함
+- 위치: `HudSeed.cs:18` · 분류: Unity 안티패턴 · Jev 0.53
+- 이유: `tag` 프로퍼티를 읽어 문자열 비교를 하는 대신 `CompareTag`를 사용해야 한다. 현재 코드는 태그 비교 시 불필요한 문자열 처리 비용이 발생한다.
+- 수정 제안: if (other.CompareTag("Player"))
 
 ```csharp
-hpLabel.text = $"HP {health.Current} / {health.Max}";
+if (other.gameObject.tag == "Player")
 ```
 
-#### UNITY-004 · Update에서 Rigidbody2D.MovePosition 호출 및 이동량의 프레임 의존
-- 위치: `PlayerSeed.cs:12-17` · 분류: Unity 안티패턴 · Jev 0.93
-- 이유: 물리 오브젝트 이동을 Update에서 수행하고 이동량에 시간 간격을 곱하지 않아 프레임 수에 따라 이동 속도가 달라질 수 있습니다. Rigidbody2D 물리 처리는 FixedUpdate에서 수행하고 fixedDeltaTime을 적용해야 합니다.
-- 수정 제안: 입력 값은 Update에서 읽되 Rigidbody2D 참조는 캐싱하고, MovePosition은 FixedUpdate에서 `body.MovePosition(body.position + input * moveSpeed * Time.fixedDeltaTime)`처럼 호출합니다.
+#### PERF-003 · Update의 GetComponent<Rigidbody2D> 매 프레임 호출
+- 위치: `PlayerSeed.cs:12-17` · 분류: 성능 · Jev 0.71
+- 이유: 매 프레임 동일한 Rigidbody2D를 컴포넌트 검색으로 가져와 불필요한 실행 비용이 발생합니다.
+- 수정 제안: `private Rigidbody2D body;`를 선언하고 Awake에서 `body = GetComponent<Rigidbody2D>();`로 한 번만 가져오세요.
 
 ```csharp
 private void Update()
@@ -138,44 +160,27 @@ private void Update()
     body.MovePosition(body.position + input * moveSpeed);
 ```
 
-#### PERF-003 · Update의 GetComponent<Rigidbody2D> 매 프레임 호출
-- 위치: `PlayerSeed.cs:16` · 분류: 성능 (+버그, Unity 안티패턴) · Jev 0.79
-- 이유: Update에서 같은 오브젝트의 Rigidbody2D를 매 프레임 GetComponent로 검색해 불필요한 반복 비용이 발생합니다. 해당 참조는 런타임 동안 변하지 않으므로 초기화 시 한 번 얻어 재사용해야 합니다.
-- 수정 제안: Rigidbody2D 필드를 선언하고 Awake 또는 Start에서 GetComponent<Rigidbody2D>() 결과를 캐싱한 뒤, Update와 FixedUpdate에서는 캐시된 참조를 사용합니다. 인스펙터 할당 방식을 사용할 경우 필수 참조 누락도 함께 검증합니다.
+#### PERF-004 · Animator 파라미터 문자열을 매 프레임 사용함
+- 위치: `PlayerSeed.cs:19-20` · 분류: 성능 · Jev 0.65
+- 이유: SetBool(string, bool) 호출 때마다 문자열 이름을 Animator 파라미터 ID로 변환하는 비용이 발생한다.
+- 수정 제안: 파라미터 해시를 한 번만 생성해 사용한다.
 
-```csharp
-Rigidbody2D body = GetComponent<Rigidbody2D>();
-```
-
-#### PERF-004 · Animator 문자열 파라미터를 매 프레임 사용
-- 위치: `PlayerSeed.cs:20` · 분류: 성능 · Jev 0.65
-- 이유: 매 프레임 문자열 이름을 사용해 Animator 파라미터를 설정한다. 해시를 캐싱하면 반복적인 문자열 조회 비용을 줄일 수 있다.
-- 수정 제안: ```csharp
 private static readonly int IsFireHash = Animator.StringToHash("IsFire");
-```
-```csharp
+
+// Update
 animator.SetBool(IsFireHash, firing);
-```
 
 ```csharp
+bool firing = Input.GetMouseButton(0);
 animator.SetBool("IsFire", firing);
 ```
 
 
-### P3 유지보수 — 2건
+### P3 유지보수 — 1건
 
-#### UNITY-005 · 태그 비교에 gameObject.tag를 사용한다
-- 위치: `HudSeed.cs:18` · 분류: Unity 안티패턴 · Jev 0.60
-- 이유: 태그 비교는 `CompareTag`를 사용해야 하며, Unity의 태그 검사 최적화와 태그 오타 검사를 활용할 수 있습니다.
-- 수정 제안: if (other.CompareTag("Player"))
-
-```csharp
-if (other.gameObject.tag == "Player")
-```
-
-#### UNITY-006 · 체력 값을 public 필드로 노출한다
-- 위치: `HudSeed.cs:25-29` · 분류: Unity 안티패턴 · Jev 0.58
-- 이유: 외부 코드나 인스펙터에서 체력 값을 임의로 변경할 수 있어 상태 캡슐화가 되지 않습니다. Unity 직렬화가 필요하다면 private 필드와 프로퍼티를 분리하는 편이 안전합니다.
+#### UNITY-006 · MonoBehaviour의 상태 필드를 public으로 노출함
+- 위치: `HudSeed.cs:25-28` · 분류: Unity 안티패턴 · Jev 0.73
+- 이유: 외부 코드와 인스펙터에서 체력 값을 임의로 변경할 수 있어 상태 불변식이 깨지기 쉽다. Unity 직렬화가 필요하다면 private 필드와 프로퍼티를 분리하는 편이 안전하다.
 - 수정 제안: [SerializeField] private int current = 10;
 [SerializeField] private int max = 10;
 
@@ -195,10 +200,10 @@ public class PlayerHealthSeed : MonoBehaviour
 
 | 파일 | 줄 | P0 | P1 | P2 | P3 |
 | --- | --- | --- | --- | --- | --- |
-| `EnemySeed.cs` | 54 | 0 | 3 | 0 | 0 |
+| `EnemySeed.cs` | 54 | 1 | 2 | 0 | 0 |
 | `GameManagerSeed.cs` | 29 | 0 | 2 | 0 | 0 |
-| `HudSeed.cs` | 30 | 0 | 0 | 3 | 2 |
-| `PlayerSeed.cs` | 23 | 0 | 0 | 3 | 0 |
+| `HudSeed.cs` | 30 | 0 | 0 | 3 | 1 |
+| `PlayerSeed.cs` | 23 | 0 | 1 | 2 | 0 |
 | `WeaponSeed.cs` | 36 | 0 | 1 | 0 | 0 |
 
 지적 없는 파일: 0개

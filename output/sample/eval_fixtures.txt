@@ -1,19 +1,18 @@
-실행: 20261012_000842
+실행: 20261012_004013
 | # | 심은 문제 | 기대 분류 | 결과 |
 | --- | --- | --- | --- |
-| 1 | 부모가 있는(자식) 오브젝트에 DontDestroyOnLoad — 실제 사례 재현 | unity | ✅ UNITY-002 (P1) GameManagerSeed.cs:16 |
-| 2 | 싱글턴 중복 시 Destroy 없음 | unity/bug | ✅ BUG-003 (P1) GameManagerSeed.cs:14 |
-| 3 | Update 에서 GetComponent<Rigidbody2D>() | perf | ✅ PERF-003 (P2) PlayerSeed.cs:16 |
-| 4 | Animator.SetBool 문자열 파라미터 매 프레임 | perf | ✅ PERF-004 (P2) PlayerSeed.cs:20 |
-| 5 | Update 에서 물리 이동, Time.deltaTime 없음 | unity/bug | ✅ UNITY-004 (P2) PlayerSeed.cs:12 |
-| 6 | OnEnable 에서 이벤트 +=, 해제 없음 | bug | ✅ BUG-001 (P1) EnemySeed.cs:17 |
+| 1 | 부모가 있는(자식) 오브젝트에 DontDestroyOnLoad — 실제 사례 재현 | unity | ✅ UNITY-002 (P1) GameManagerSeed.cs:5 |
+| 2 | 싱글턴 중복 시 Destroy 없음 | unity/bug | ✅ UNITY-003 (P1) GameManagerSeed.cs:14 |
+| 3 | Update 에서 GetComponent<Rigidbody2D>() | perf | ✅ PERF-003 (P2) PlayerSeed.cs:12 |
+| 4 | Animator.SetBool 문자열 파라미터 매 프레임 | perf | ✅ PERF-004 (P2) PlayerSeed.cs:19 |
+| 5 | Update 에서 물리 이동, Time.deltaTime 없음 | unity/bug | ✅ UNITY-004 (P1) PlayerSeed.cs:16 |
+| 6 | OnEnable 에서 이벤트 +=, 해제 없음 | bug | ✅ BUG-002 (P1) EnemySeed.cs:17 |
 | 7 | UnityEngine.Object 에 ?. / ?? | unity | ✅ UNITY-001 (P1) EnemySeed.cs:24 |
-| 8 | foreach 중 List.Remove | bug | ✅ BUG-002 (P1) EnemySeed.cs:30 |
-| 9 | Update 에서 FindObjectOfType + 보간 문자열 생성 | perf | ✅ UNITY-003 (P2) HudSeed.cs:12 |
-| 10 | tag == "Player" 대신 CompareTag | unity/perf | ✅ UNITY-005 (P3) HudSeed.cs:18 |
-| 11 | 사용 횟수 감소 후 0 검사 없이 배열 접근 | bug | ✅ BUG-004 (P1) WeaponSeed.cs:17 |
+| 8 | foreach 중 List.Remove | bug | ✅ BUG-001 (P0) EnemySeed.cs:30 |
+| 9 | Update 에서 FindObjectOfType + 보간 문자열 생성 | perf | ✅ PERF-001 (P2) HudSeed.cs:10 |
+| 10 | tag == "Player" 대신 CompareTag | unity/perf | ✅ UNITY-005 (P2) HudSeed.cs:18 |
+| 11 | 사용 횟수 감소 후 0 검사 없이 배열 접근 | bug | ✅ BUG-003 (P1) WeaponSeed.cs:17 |
 
-탐지: 11/11 · 함정 오탐: 0건 · 정답 밖 지적: 3건
-  - 정답 밖: PERF-001 HudSeed.cs:13 HP UI를 매 프레임 폴링하고 갱신
-  - 정답 밖: PERF-002 HudSeed.cs:13 문자열 보간으로 매 프레임 HP 문자열 생성
-  - 정답 밖: UNITY-006 HudSeed.cs:25 체력 값을 public 필드로 노출한다
+탐지: 11/11 · 함정 오탐: 0건 · 정답 밖 지적: 2건
+  - 정답 밖: PERF-002 HudSeed.cs:10 Update에서 HP 문자열과 hpLabel.text를 매 프레임 갱신
+  - 정답 밖: UNITY-006 HudSeed.cs:25 MonoBehaviour의 상태 필드를 public으로 노출함

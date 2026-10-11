@@ -51,7 +51,7 @@
         "bug"
       ],
       "keyword": "Update 에서 물리 이동, Time.deltaTime 없음",
-      "match": "deltaTime|FixedUpdate|물리|프레임"
+      "match": "deltaTime|FixedUpdate|물리|프레임|시간"
     },
     {
       "id": 6,

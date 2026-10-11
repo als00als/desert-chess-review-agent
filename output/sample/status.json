@@ -8,40 +8,40 @@
     "perf",
     "unity"
   ],
-  "raw_findings": 22,
+  "raw_findings": 19,
   "rejected": 0,
-  "merged": 8,
-  "final": 14,
+  "merged": 6,
+  "final": 13,
   "by_severity": {
-    "P0": 0,
+    "P0": 1,
     "P1": 6,
-    "P2": 6,
-    "P3": 2
+    "P2": 5,
+    "P3": 1
   },
   "by_category": {
-    "bug": 4,
+    "bug": 3,
     "perf": 4,
     "unity": 6
   },
-  "elapsed_sec": 72.2,
-  "tokens": 56956,
+  "elapsed_sec": 64.7,
+  "tokens": 56682,
   "usage": {
     "gpt-5.6-luna": {
-      "total_tokens": 56956,
-      "output_tokens": 16483,
       "output_token_details": {
-        "reasoning": 4224
+        "reasoning": 4351
       },
-      "input_tokens": 40473,
+      "total_tokens": 56682,
       "input_token_details": {
-        "cache_creation": 24284,
-        "cache_read": 9734
-      }
+        "cache_creation": 17730,
+        "cache_read": 17470
+      },
+      "output_tokens": 15829,
+      "input_tokens": 40853
     }
   },
   "tool_calls": {
     "read_file": 5
   },
   "errors": [],
-  "jev_actionability": 2.91
+  "jev_actionability": 2.92
 }

@@ -13,6 +13,7 @@ COMMON_RULES = f"""당신은 Unity 6 (C#) 게임 코드 리뷰어다. 입력으�
 규칙
 - 한국어로 쓴다.
 - 확실한 문제만 지적한다. 추측이나 "~일 수도 있다" 수준이면 지적하지 않는다.
+- 리뷰 대상은 Unity 에서 이미 컴파일되는 코드다. "컴파일되지 않는다" 류의 지적은 하지 않는다.
 - 줄 번호는 입력 코드 왼쪽에 붙은 번호를 그대로 쓴다. 범위는 메서드 전체가 아니라 문제가 되는 줄만(보통 1~5줄) 잡는다. 파일 경로는 '===== FILE:' 뒤의 경로를 그대로 쓴다.
 - 자기 관점(아래 체크리스트) 밖의 문제는 지적하지 않는다. 다른 리뷰어가 따로 본다.
 - 다른 파일의 맥락(이 메서드를 누가 부르는지, 필드가 어디서 할당되는지)이 판단에 꼭 필요할 때만 도구로 확인한다.
@@ -55,14 +56,16 @@ CHECKLISTS = {
 - 빈번한 Instantiate/Destroy → 오브젝트 풀
 - Debug.Log 가 매 프레임 호출
 - 이벤트/UI 갱신을 매 프레임 폴링(값이 바뀔 때만 갱신 가능한 경우)
-매 프레임 호출이라는 전제가 코드에서 확인되지 않으면(한 번만 불리는 Awake/Start, 버튼 클릭 등) 지적하지 않는다.""",
+매 프레임 호출이라는 전제가 코드에서 확인되지 않으면(한 번만 불리는 Awake/Start, 버튼 클릭 등) 지적하지 않는다.
+⚠ 이동·충돌 판정에 꼭 필요한 Physics2D 캐스트/레이캐스트처럼 게임 동작에 필요한 매 프레임 작업은, 같은 결과를 더 싸게 얻는 구체적 방법이 없으면 지적하지 않는다.""",
     "unity": """관점: Unity 안티패턴 (에러 없이 조용히 틀리는 Unity 특유의 사용법)
 체크리스트
 - DontDestroyOnLoad 를 루트가 아닌(부모가 있는) 오브젝트에 호출 → 경고만 뜨고 무시된다. 주석·씬 설명에 부모가 있으면 확실한 문제다
 - 싱글턴: Instance 가 이미 있을 때 Destroy 처리 누락(중복 생성), 씬 재로드 시 정적 참조가 파괴된 객체를 가리킴
 - UnityEngine.Object(Transform, GameObject, Component 등)에 ?., ??, is null 사용 → 파괴된 객체의 가짜 null 을 무시한다
-- public 필드 남용 → [SerializeField] private
-- tag == "x" / gameObject.tag 비교 → CompareTag (할당 없음, 오타 검사)
+- MonoBehaviour/ScriptableObject 의 public 필드 남용 → [SerializeField] private
+  (⚠ [Serializable] 데이터 struct/class, DTO, 테이블 행 같은 순수 데이터 컨테이너의 public 필드는 지적하지 않는다)
+- tag == "x" / gameObject.tag 비교 → CompareTag (tag 프로퍼티는 읽을 때마다 문자열을 할당한다. CompareTag 는 할당이 없다)
 - SendMessage/BroadcastMessage, Invoke("문자열")
 - Time.deltaTime 누락으로 프레임레이트에 따라 속도가 바뀜, 물리(Rigidbody) 이동을 Update 에서 처리, FixedUpdate 에서 Time.fixedDeltaTime 혼동
 - OnValidate/에디터 전용 API(UnityEditor) 사용 코드의 #if UNITY_EDITOR 누락""",
@@ -77,6 +80,9 @@ WORKER_PROMPTS["verifier"] = """당신은 코드 리뷰 검증자다. 다른 리
   1) 존재: 근거 코드가 그 위치(또는 가까운 줄)에 실제로 있는가. 줄 번호만 틀렸으면 실제 줄 번호를 적는다.
   2) 타당: 이유가 Unity/C# 동작에 비추어 사실인가. "매 프레임 호출" 같은 전제가 있으면 실제로 Update 등에서 불리는지 확인한다.
      이미 다른 곳에서 막고 있는(예: 호출 전에 null 검사, OnDisable 에서 해제) 경우는 타당하지 않다.
+     리뷰 대상은 Unity 에서 이미 컴파일되는 코드이므로 "컴파일 오류" 주장은 타당하지 않다.
+     핵심 문제(그 코드가 왜 고쳐야 하는지)가 실제로 있으면, 이유 설명의 일부 표현이 부정확해도 타당으로 보고 부정확한 부분은 근거에 적는다.
+     Unity API 의 실제 동작(예: Mathf.Sign(0) 은 1 을 돌려준다)을 기준으로 판단한다.
 - 한국어로, 지적 번호 순서대로 답한다.
 
 답변 형식 (지적마다)
