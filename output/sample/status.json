@@ -1,0 +1,47 @@
+{
+  "model": "gpt-5.6-luna",
+  "files": 5,
+  "lines": 167,
+  "batches": 1,
+  "reviewers": [
+    "bug",
+    "perf",
+    "unity"
+  ],
+  "raw_findings": 25,
+  "rejected": 0,
+  "merged": 8,
+  "final": 17,
+  "by_severity": {
+    "P0": 4,
+    "P1": 4,
+    "P2": 7,
+    "P3": 2
+  },
+  "by_category": {
+    "bug": 7,
+    "perf": 3,
+    "unity": 7
+  },
+  "elapsed_sec": 85.4,
+  "tokens": 59563,
+  "usage": {
+    "gpt-5.6-luna": {
+      "input_token_details": {
+        "cache_read": 1120,
+        "cache_creation": 31619
+      },
+      "total_tokens": 59563,
+      "output_tokens": 19308,
+      "input_tokens": 40255,
+      "output_token_details": {
+        "reasoning": 5822
+      }
+    }
+  },
+  "tool_calls": {
+    "read_file": 5
+  },
+  "errors": [],
+  "jev_actionability": 2.86
+}

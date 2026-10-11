@@ -19,7 +19,7 @@ JEV_MODEL = os.getenv("TYPESAFE_MODEL", "jev-1.13.0")
 
 REVIEWERS = ("bug", "perf", "unity")   # 리뷰어 종류. --only 로 일부만 고를 수 있다
 BATCH_LINES = 600          # 리뷰어 1회 호출에 넣을 코드 줄 수 상한
-MAX_FILES = 60             # 비용 상한 (--max-files 로 덮어쓴다)
+MAX_FILES = 100            # 비용 상한 (--max-files 로 덮어쓴다)
 MAX_PARALLEL = 4           # graph.ainvoke config 의 max_concurrency. API 속도 제한 대비
 PASS_PROB = 0.5            # Jev 가 지적이 타당하다고 본 확률이 이 값 이상이면 통과
 WORKER_CALL_LIMIT = 12     # 에이전트 한 번 실행당 모델 호출 상한
