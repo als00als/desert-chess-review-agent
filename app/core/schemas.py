@@ -40,11 +40,16 @@ class VerifyResult(BaseModel):
     verdicts: list[Verdict] = Field(description="입력 지적마다 하나씩, 같은 순서로")
 
 
-# 취합자 출력: 후보 묶음 하나에 대한 결정
-class MergeDecision(BaseModel):
-    """같은 위치를 가리키는 지적 여러 개가 같은 문제인지와, 합친 내용."""
-    same_issue: bool = Field(description="모두 같은 원인의 같은 문제인가")
+# 취합자 출력: 후보 묶음을 같은 문제끼리 나눈 결과
+class MergedIssue(BaseModel):
+    """같은 원인의 같은 문제로 본 지적들과 합친 내용."""
+    indices: list[int] = Field(description="이 문제에 속하는 입력 지적 번호들. 혼자면 번호 하나")
     title: str = Field(description="합친 한 줄 요약")
     reason: str = Field(description="합친 이유")
     suggestion: str = Field(description="합친 수정 제안")
     severity: Severity = Field(description="심각도 기준에 따라 다시 정한 최종 등급")
+
+
+class MergeDecision(BaseModel):
+    """후보 묶음 하나를 같은 문제끼리 나눈 목록. 모든 입력 번호가 정확히 한 번씩 들어간다."""
+    issues: list[MergedIssue] = Field(description="문제 목록")

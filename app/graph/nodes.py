@@ -164,7 +164,8 @@ async def verifier(state: VerifyInput) -> dict:
     return {"verified": {file: passed}, "rejected": rejected, "messages": messages[1:]}
 
 
-# [보조 함수] 병합 후보 찾기: 같은 파일 + 줄 범위가 겹치고(±1) 제목이나 근거 코드가 비슷하면 한 묶음
+# [보조 함수] 병합 후보 찾기: 같은 파일에서 줄 범위가 겹치거나(±1) 근거 코드가 거의 같으면 한 묶음
+# 제목은 리뷰어마다 표현이 달라 유사도로 거르지 않는다. 묶음 안을 같은 문제끼리 나누는 일은 LLM 이 한다
 def candidate_groups(items: list[dict]) -> list[list[dict]]:
     """union-find 로 묶은 지적 그룹 목록을 돌려준다. 혼자인 지적도 길이 1 그룹으로 들어간다."""
     parent = list(range(len(items)))
@@ -175,16 +176,14 @@ def candidate_groups(items: list[dict]) -> list[list[dict]]:
             i = parent[i]
         return i
 
-    def similar(a, b):
-        title = difflib.SequenceMatcher(None, a["title"], b["title"]).ratio()
-        code = difflib.SequenceMatcher(None, a["evidence"], b["evidence"]).ratio()
-        return max(title, code) >= 0.6
-
     for i, a in enumerate(items):
         for j in range(i + 1, len(items)):
             b = items[j]
+            if a["file"] != b["file"]:
+                continue
             overlap = a["line_start"] <= b["line_end"] + 1 and b["line_start"] <= a["line_end"] + 1
-            if a["file"] == b["file"] and overlap and similar(a, b):
+            same_code = difflib.SequenceMatcher(None, a["evidence"], b["evidence"]).ratio() >= 0.8
+            if overlap or same_code:
                 parent[find(j)] = find(i)
     groups = {}
     for i, f in enumerate(items):
@@ -209,14 +208,24 @@ async def aggregator(state: ReviewState) -> dict:
         except Exception as e:
             print(f"aggregator: 병합 판단 실패 {type(e).__name__}: {e}")
             return group
-        if not d.same_issue:
-            return group
-        base = min(group, key=lambda f: SEVERITY_ORDER[f["severity"]])
-        confs = [f["confidence"] for f in group if f.get("confidence") is not None]
-        return [base | {"title": d.title, "reason": d.reason, "suggestion": d.suggestion, "severity": d.severity,
-                        "line_start": min(f["line_start"] for f in group), "line_end": max(f["line_end"] for f in group),
-                        "also": sorted({f["category"] for f in group} - {base["category"]}),
-                        "confidence": max(confs) if confs else None}]
+        out, seen = [], set()
+        for issue in d.issues:
+            members = [group[i] for i in dict.fromkeys(issue.indices) if 0 <= i < len(group) and i not in seen]
+            if not members:
+                continue
+            seen.update(i for i in issue.indices if 0 <= i < len(group))
+            # 가장 심각한 원래 지적을 바탕으로, 위치는 가장 좁은 지적 것을 쓴다
+            base = min(members, key=lambda f: SEVERITY_ORDER[f["severity"]])
+            narrow = min(members, key=lambda f: f["line_end"] - f["line_start"])
+            confs = [f["confidence"] for f in members if f.get("confidence") is not None]
+            out.append(base | {"title": issue.title, "reason": issue.reason, "suggestion": issue.suggestion,
+                               "severity": issue.severity, "line_start": narrow["line_start"],
+                               "line_end": narrow["line_end"], "evidence": narrow["evidence"],
+                               "also": sorted({f["category"] for f in members} - {base["category"]}),
+                               "confidence": max(confs) if confs else None})
+        # 모델이 빠뜨린 번호는 그대로 남긴다 (지적을 잃지 않게)
+        out += [f for i, f in enumerate(group) if i not in seen]
+        return out
 
     merged = [f for out in await asyncio.gather(*(merge(g) for g in groups)) for f in out]
     merged.sort(key=lambda f: (SEVERITY_ORDER[f["severity"]], f["file"], f["line_start"]))
