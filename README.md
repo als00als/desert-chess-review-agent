@@ -7,8 +7,6 @@ uv run -m app.main "C:/Project_Game/Desert Chess/dessert chess/Desert-Chess/Asse
 # → output/<실행 시각>/review_report.md, findings.json, status.json, messages.json
 ```
 
-> AI Campus 과제 「나만의 에이전트 설계·구현」 B안 제출물. 2인 팀 게임 프로젝트 **데저트 체스**(Unity 6, URP 2D)의 실제 코드를 리뷰합니다.
-
 ---
 
 ## 1. 프로젝트 소개 — 무엇을 해결하는가
