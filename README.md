@@ -83,7 +83,8 @@ graph TD
 
 1. **Python 3.12**, **[uv](https://docs.astral.sh/uv/)**
 2. 의존성 설치: `uv sync`
-3. `.env.example`을 `.env`로 복사하고 키를 채웁니다. (`.env`는 `.gitignore`에 있어 커밋되지 않습니다)
+3. `.env.example`을 `.env`로 복사하고 키를 채웁니다. (`.env`는 `.gitignore`에 있어 커밋되지 않습니다. **`.env`가 없으면 import 단계에서 멈춥니다**)
+   - macOS / Linux: `cp .env.example .env` · Windows PowerShell: `Copy-Item .env.example .env`
 
 | 키 | 필수 | 용도 |
 | --- | --- | --- |
