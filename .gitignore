@@ -1,0 +1,17 @@
+# 비밀 키: 절대 커밋하지 않는다
+.env
+.env.*
+!.env.example
+
+# Python / uv
+.venv/
+__pycache__/
+*.pyc
+
+# 실행 산출물: 실행마다 생기는 폴더는 올리지 않고, 공개용 예시는 output/sample/ 만 올린다
+output/*
+!output/sample/
+
+# IDE
+.idea/
+.vscode/
