@@ -42,10 +42,15 @@ def fix_path(path: str, batch_files: list[str]) -> str | None:
     return same[0] if len(same) == 1 else None
 
 
-# [보조 함수] 실제 코드 발췌: 지적한 줄 앞뒤 5줄을 줄번호와 함께 읽는다. Jev 판정과 리포트 검증에 쓴다
+# [보조 함수] 실제 코드 발췌: 파일 머리(첫 클래스 선언까지, 최대 30줄)와 지적한 줄 앞뒤 5줄을 줄번호와 함께 읽는다
+# 이유: 씬 계층·용도 같은 전제는 파일 머리 주석에 있는 경우가 많다. 앞뒤 5줄만 주면 Jev 가 전제를 확인하지 못해 타당한 지적을 기각한다
 def excerpt(root: Path, file: str, start: int, end: int, pad: int = 5) -> str:
     lines = read_lines(root / file)
-    return numbered(lines, max(1, start - pad), min(len(lines), end + pad))
+    lo, hi = max(1, start - pad), min(len(lines), end + pad)
+    head_end = next((i for i, s in enumerate(lines[:30], 1) if " class " in f" {s} "), 0)
+    if head_end and head_end < lo - 1:
+        return numbered(lines, 1, head_end) + "\n  ...\n" + numbered(lines, lo, hi)
+    return numbered(lines, min(lo, head_end or lo), hi)
 
 
 # [보조 함수] 줄 번호 바로잡기: 근거 코드 첫 줄이 실제로 있는 줄을 코드로 찾는다
@@ -218,10 +223,12 @@ async def aggregator(state: ReviewState) -> dict:
             base = min(members, key=lambda f: SEVERITY_ORDER[f["severity"]])
             narrow = min(members, key=lambda f: f["line_end"] - f["line_start"])
             confs = [f["confidence"] for f in members if f.get("confidence") is not None]
+            # 분류는 병합한 문제의 성격으로 LLM 이 정한다 (가장 심각한 지적의 분류를 따르면 성능 문제가 버그로 집계된다)
+            category = issue.category if issue.category in {f["category"] for f in members} else base["category"]
             out.append(base | {"title": issue.title, "reason": issue.reason, "suggestion": issue.suggestion,
                                "severity": issue.severity, "line_start": narrow["line_start"],
-                               "line_end": narrow["line_end"], "evidence": narrow["evidence"],
-                               "also": sorted({f["category"] for f in members} - {base["category"]}),
+                               "line_end": narrow["line_end"], "evidence": narrow["evidence"], "category": category,
+                               "also": sorted({f["category"] for f in members} - {category}),
                                "confidence": max(confs) if confs else None})
         # 모델이 빠뜨린 번호는 그대로 남긴다 (지적을 잃지 않게)
         out += [f for i, f in enumerate(group) if i not in seen]

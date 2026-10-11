@@ -45,5 +45,10 @@ namespace SeededBugs
                 Destroy(gameObject);
             }
         }
+
+        public void RegisterAlly(EnemySeed ally)
+        {
+            nearbyAllies.Add(ally);
+        }
     }
 }

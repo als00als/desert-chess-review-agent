@@ -3,6 +3,7 @@
 사용: uv run python scripts/eval_fixtures.py [output/<실행 폴더>]   (생략하면 가장 최근 실행)
 """
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -15,23 +16,28 @@ def near(f: dict, line: int) -> bool:
     return f["line_start"] - TOLERANCE <= line <= f["line_end"] + TOLERANCE
 
 
+def says(f: dict, e: dict) -> bool:
+    """정답에 match 정규식이 있으면 지적 제목에 그 말이 있어야 한다 (줄이 겹치는 정답끼리 헷갈리지 않게)."""
+    return not e.get("match") or re.search(e["match"], f["title"]) is not None
+
+
 def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
-    runs = sorted(p for p in (PROJECT_DIR / "output").iterdir() if (p / "findings.json").exists())
+    runs = sorted(p for p in (PROJECT_DIR / "output").iterdir() if p.name[:1].isdigit() and (p / "findings.json").exists())
     run = Path(sys.argv[1]) if len(sys.argv) > 1 else runs[-1]
     findings = json.loads((run / "findings.json").read_text(encoding="utf-8"))["findings"]
     expected = json.loads(EXPECTED.read_text(encoding="utf-8"))
 
     used, rows = set(), []
     for e in expected["seeded"]:
-        # 같은 파일, 줄 ±3, 분류(병합된 also 포함)가 맞는 지적 중 아직 매칭되지 않은 것 하나
+        # 같은 파일, 줄 ±3, 내용(match), 분류(병합된 also 포함)가 맞는 지적 중 아직 매칭되지 않은 것 하나
         hit = next((i for i, f in enumerate(findings)
                     if i not in used and f["file"].endswith(e["file"]) and near(f, e["line"])
-                    and ({f["category"], *f.get("also", [])} & set(e["category"]))), None)
+                    and says(f, e) and ({f["category"], *f.get("also", [])} & set(e["category"]))), None)
         if hit is None:   # 분류는 달라도 위치가 맞으면 '위치만 일치'로 따로 센다
             loose = next((i for i, f in enumerate(findings)
-                          if i not in used and f["file"].endswith(e["file"]) and near(f, e["line"])), None)
+                          if i not in used and f["file"].endswith(e["file"]) and near(f, e["line"]) and says(f, e)), None)
             rows.append((e, None, loose))
         else:
             used.add(hit)

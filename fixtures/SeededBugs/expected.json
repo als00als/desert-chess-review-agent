@@ -1,19 +1,122 @@
 {
-  "description": "의도적으로 심은 문제의 정답지. eval_fixtures.py 가 파일 + 줄(±3) + 분류로 매칭한다. trap 은 지적하면 오탐이다.",
+  "description": "의도적으로 심은 문제의 정답지. eval_fixtures.py 가 파일 + 줄(±3) + 분류 + (있으면) match 정규식(지적 제목)으로 매칭한다. trap 은 지적하면 오탐이다.",
   "seeded": [
-    {"id": 1,  "file": "GameManagerSeed.cs", "line": 17, "category": ["unity"],         "keyword": "부모가 있는(자식) 오브젝트에 DontDestroyOnLoad — 실제 사례 재현"},
-    {"id": 2,  "file": "GameManagerSeed.cs", "line": 16, "category": ["unity", "bug"],  "keyword": "싱글턴 중복 시 Destroy 없음"},
-    {"id": 3,  "file": "PlayerSeed.cs",      "line": 16, "category": ["perf"],          "keyword": "Update 에서 GetComponent<Rigidbody2D>()"},
-    {"id": 4,  "file": "PlayerSeed.cs",      "line": 20, "category": ["perf"],          "keyword": "Animator.SetBool 문자열 파라미터 매 프레임"},
-    {"id": 5,  "file": "PlayerSeed.cs",      "line": 17, "category": ["unity", "bug"],  "keyword": "Update 에서 물리 이동, Time.deltaTime 없음"},
-    {"id": 6,  "file": "EnemySeed.cs",       "line": 19, "category": ["bug"],           "keyword": "OnEnable 에서 이벤트 +=, 해제 없음"},
-    {"id": 7,  "file": "EnemySeed.cs",       "line": 24, "category": ["unity"],         "keyword": "UnityEngine.Object 에 ?. / ??"},
-    {"id": 8,  "file": "EnemySeed.cs",       "line": 34, "category": ["bug"],           "keyword": "foreach 중 List.Remove"},
-    {"id": 9,  "file": "HudSeed.cs",         "line": 12, "category": ["perf"],          "keyword": "Update 에서 FindObjectOfType + 보간 문자열 생성"},
-    {"id": 10, "file": "HudSeed.cs",         "line": 18, "category": ["unity", "perf"], "keyword": "tag == \"Player\" 대신 CompareTag"},
-    {"id": 11, "file": "WeaponSeed.cs",      "line": 20, "category": ["bug"],           "keyword": "사용 횟수 감소 후 0 검사 없이 배열 접근"}
+    {
+      "id": 1,
+      "file": "GameManagerSeed.cs",
+      "line": 17,
+      "category": [
+        "unity"
+      ],
+      "keyword": "부모가 있는(자식) 오브젝트에 DontDestroyOnLoad — 실제 사례 재현",
+      "match": "DontDestroyOnLoad"
+    },
+    {
+      "id": 2,
+      "file": "GameManagerSeed.cs",
+      "line": 16,
+      "category": [
+        "unity",
+        "bug"
+      ],
+      "keyword": "싱글턴 중복 시 Destroy 없음",
+      "match": "싱글턴|중복|Instance"
+    },
+    {
+      "id": 3,
+      "file": "PlayerSeed.cs",
+      "line": 16,
+      "category": [
+        "perf"
+      ],
+      "keyword": "Update 에서 GetComponent<Rigidbody2D>()",
+      "match": "GetComponent|Rigidbody2D"
+    },
+    {
+      "id": 4,
+      "file": "PlayerSeed.cs",
+      "line": 20,
+      "category": [
+        "perf"
+      ],
+      "keyword": "Animator.SetBool 문자열 파라미터 매 프레임",
+      "match": "SetBool|StringToHash|문자열|해시"
+    },
+    {
+      "id": 5,
+      "file": "PlayerSeed.cs",
+      "line": 17,
+      "category": [
+        "unity",
+        "bug"
+      ],
+      "keyword": "Update 에서 물리 이동, Time.deltaTime 없음",
+      "match": "deltaTime|FixedUpdate|물리|프레임"
+    },
+    {
+      "id": 6,
+      "file": "EnemySeed.cs",
+      "line": 19,
+      "category": [
+        "bug"
+      ],
+      "keyword": "OnEnable 에서 이벤트 +=, 해제 없음"
+    },
+    {
+      "id": 7,
+      "file": "EnemySeed.cs",
+      "line": 24,
+      "category": [
+        "unity"
+      ],
+      "keyword": "UnityEngine.Object 에 ?. / ??"
+    },
+    {
+      "id": 8,
+      "file": "EnemySeed.cs",
+      "line": 34,
+      "category": [
+        "bug"
+      ],
+      "keyword": "foreach 중 List.Remove"
+    },
+    {
+      "id": 9,
+      "file": "HudSeed.cs",
+      "line": 12,
+      "category": [
+        "perf"
+      ],
+      "keyword": "Update 에서 FindObjectOfType + 보간 문자열 생성",
+      "match": "Find|검색"
+    },
+    {
+      "id": 10,
+      "file": "HudSeed.cs",
+      "line": 18,
+      "category": [
+        "unity",
+        "perf"
+      ],
+      "keyword": "tag == \"Player\" 대신 CompareTag"
+    },
+    {
+      "id": 11,
+      "file": "WeaponSeed.cs",
+      "line": 20,
+      "category": [
+        "bug"
+      ],
+      "keyword": "사용 횟수 감소 후 0 검사 없이 배열 접근",
+      "match": "인덱스|범위|배열|0"
+    }
   ],
   "traps": [
-    {"file": "WeaponSeed.cs", "line_start": 24, "line_end": 32, "keyword": "Reload 는 정상 코드. 지적하면 오탐"}
+    {
+      "file": "WeaponSeed.cs",
+      "line_start": 24,
+      "line_end": 32,
+      "keyword": "Reload 는 정상 코드. 지적하면 오탐"
+    }
   ]
 }

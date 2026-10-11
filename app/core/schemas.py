@@ -44,6 +44,8 @@ class VerifyResult(BaseModel):
 class MergedIssue(BaseModel):
     """같은 원인의 같은 문제로 본 지적들과 합친 내용."""
     indices: list[int] = Field(description="이 문제에 속하는 입력 지적 번호들. 혼자면 번호 하나")
+    category: Literal["bug", "perf", "unity"] = Field(
+        description="문제의 성격에 가장 맞는 분류. bug: 잘못된 동작·예외, perf: 매 프레임 비용·GC 할당, unity: Unity 특유의 잘못된 사용법")
     title: str = Field(description="합친 한 줄 요약")
     reason: str = Field(description="합친 이유")
     suggestion: str = Field(description="합친 수정 제안")
